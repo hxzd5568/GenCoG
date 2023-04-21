@@ -13,7 +13,6 @@ class ErrorKind(IntEnum):
     COMPILE = auto()
     RUN = auto()
     COMPUTE = auto()
-    INF = auto()
 
 
 TensorDict = Dict[str, np.ndarray]
@@ -43,19 +42,6 @@ class ModuleError(Exception):
             np.savez(os.path.join(path, 'inputs.npz'), **self.inputs_)
         if self.params_ is not None:
             np.savez(os.path.join(path, 'params.npz'), **self.params_)
-    def fuzzreport(self, path: str):
-        if not os.path.exists(path):
-            os.mkdir(path)
-        with open(os.path.join(path, 'FUZZ'), 'w'):
-            pass
-        with open(os.path.join(path, 'code.txt'), 'w') as f:
-            f.write(self.code_)
-        with open(os.path.join(path, 'error.txt'), 'w') as f:
-            f.write(self.err_)
-        if self.inputs_ is not None:
-            np.savez(os.path.join(path, 'inputs.npz'), self.inputs_)
-        if self.params_ is not None:
-            np.savez(os.path.join(path, 'params.npz'), **self.params_)
 
 
 class ModuleRunner:
@@ -74,7 +60,7 @@ class ModuleRunner:
         inputs = gen_tensor_value_dict(main_fn.params[0:1], self._rng)
         params = gen_tensor_value_dict(main_fn.params[1:], self._rng)
         # ---------------Build and run unoptimized module as reference
-        
+        '''
         try:
             gmod = build_mod(mod, 0, params=params)
         except Exception as err:
@@ -107,19 +93,7 @@ class ModuleRunner:
                                       inputs=inputs, params=params)
 
         return all_outputs
-        
-    def fuzzrun(self, code: str):
-        # Parse module
-        try:
-            mod = parser.parse(code)
-        except TVMError as err:
-            raise ModuleError(ErrorKind.PARSE, code, str(err), 0)
-
-        # Generate input parameters
-        main_fn = mod['main']
-        inputs = gen_tensor_value_dict(main_fn.params[0:1], self._rng)
-        params = gen_tensor_value_dict(main_fn.params[1:], self._rng)
-
+        '''
         all_outputs = []
         for opt_level in [1,5]:
             try:
@@ -142,51 +116,13 @@ class ModuleRunner:
                                       inputs=inputs, params=params)
 
         return all_outputs
-    
-    def fuzzcheck(self, code: str):
-        # Parse module
-        try:
-            mod = relay.parse(code)
-        except TVMError as err:
-            raise ModuleError(ErrorKind.PARSE, code, str(err), 0)
+        
 
-        # Generate input parameters
-        main_fn = mod['main']
-        inputs = gen_tensor_value_dict(main_fn.params[0:1], self._rng)
-        params = gen_tensor_value_dict(main_fn.params[1:], self._rng)
-
-        all_outputs = []
-        for opt_level in [1,5]:
-            try:
-                gmod = build_mod(mod, opt_level, params=params)
-            except Exception as err:
-                raise ModuleError(ErrorKind.COMPILE, mod.astext(), str(err), opt_level)
-            try:
-                outputs = run_gmod(gmod, inputs)
-            except Exception as err:
-                raise ModuleError(ErrorKind.RUN, mod.astext(), str(err), opt_level)
-            all_outputs.append(outputs)
-        diff = np.zeros(1)
-        for i, (o, ro) in enumerate(zip(outputs[0], outputs[1])):
-                # if not np.allclose(o, ro, rtol=1e-3, atol=1e-4):
-                #     msg = f'Computation error in output tensor {i}:\n' \
-                #           f'Expect:\n' \
-                #           f'{np.array_repr(ro)}\n' \
-                #           f'Actual:\n' \
-                #           f'{np.array_repr(o)}'
-                #     raise ModuleError(ErrorKind.COMPUTE, mod.astext(), msg, opt_level,
-                #                       inputs=inputs, params=params)
-                diff =max(diff, np.linalg.norm(o/1000 - ro/1000)/o.size)
-        if diff ==np.inf or diff!= diff:
-            msg = f'inital inf/nan error :\n' 
-            raise ModuleError(ErrorKind.INF, mod.astext(), msg, opt_level,
-                                      inputs=inputs, params=params)
-        else:
-            return diff,all_outputs
 
 def gen_tensor_value(var: relay.Var, rng: Generator):
     var_ty = var.checked_type
     return rng.uniform(size=[int(d) for d in var_ty.shape]).astype(var_ty.dtype)
+
 
 def gen_tensor_value_dict(params: List[relay.Var], rng: Generator):
     return {var.name_hint: gen_tensor_value(var, rng) for var in params}

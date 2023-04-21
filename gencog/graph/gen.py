@@ -62,12 +62,43 @@ class GraphGenerator:
         graph = Graph(inputs, outputs, oprs)
 
         return graph
+    def imagegenerate(self,imageshape,imagedtype):
+        # Initialization
+        inputs = []
+        oprs = []
+        value_lu = ValueLookup()
 
+        # Generate initial input
+        init_in = Input(TensorType(imageshape, imagedtype), False)
+        inputs.append(init_in)
+        value_lu.add(init_in.value_)
+
+        # Iteratively construct computation graph
+        while len(oprs) < max_opr_num:
+            # Choose a value
+            value = self._sample_value(list(value_lu.values), {})
+
+            # Choose an operator whose first input matches this value
+            op = self._sample_op(value)
+
+            # Generate operation vertex
+            opr = self._gen_opr(op, value, value_lu, inputs)
+            if opr is None:
+                continue
+            else:
+                oprs.append(opr)
+
+        # Create final graph
+        outputs = [Output(v) for v in value_lu.values if len(v.uses_) == 0]
+        graph = Graph(inputs, outputs, oprs)
+
+        return graph
     def _gen_input(self):
         rank = self._rng.integers(low=2, high=max_rank, endpoint=True)
         shape = cast(List[int],
                      self._rng.integers(low=1, high=max_dim, size=rank, endpoint=True).tolist())
         dtype = self._rng.choice(float_dtypes)
+        print(shape,dtype)
         return Input(TensorType(shape, dtype), False)
 
     def _sample_value(self, values: List[Value], add_cnt: Dict[Value, int]):

@@ -6,9 +6,9 @@ params: Dict[str, Any] = {
     # Maximal number of output tensors for variadic operators
     'spec.max_out_num': 3,
     # Maximal rank of tensor
-    'spec.max_rank': 5,
+    'spec.max_rank': 3,
     # Maximal dimension value in tensor shape
-    'spec.max_dim': 4,
+    'spec.max_dim': 16,
 
     # Maximal number of model candidates
     'solver.max_model_cand': 4,
